@@ -2,7 +2,6 @@ package com.boomaa.pdfcombine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 public class Pages extends ArrayList<Pages.Range> {
     private final int endPage;

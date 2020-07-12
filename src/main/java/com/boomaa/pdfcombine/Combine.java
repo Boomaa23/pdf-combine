@@ -3,28 +3,29 @@ package com.boomaa.pdfcombine;
 import org.apache.pdfbox.io.MemoryUsageSetting;
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPageTree;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
-import java.awt.*;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 public class Combine {
     private static final JFrame frame = new JFrame("PDF Combiner");
-    private static final PDFMergerUtility merger = new PDFMergerUtility();
     private static final GridBagConstraints constraints = new GridBagConstraints();
-    private static final Map<File, Pages> queuedPdfs = new HashMap<>();
-    private static File lastSelectedFile = null;
+    private static PDFEntry lastSelected = null;
 
     public static void main(String[] args) {
         Container content = frame.getContentPane();
         content.setLayout(new GridBagLayout());
 
-        DefaultListModel<String> model = new DefaultListModel<>();
-        JList<String> fileList = new JList<>(model);
+        DefaultListModel<PDFEntry> model = new DefaultListModel<>();
+        JList<PDFEntry> fileList = new JList<>(model);
         fileList.setVisibleRowCount(-1);
         fileList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         fileList.setLayoutOrientation(JList.VERTICAL);
@@ -50,23 +51,25 @@ public class Combine {
         JRadioButton memBtn = new JRadioButton("Memory");
         JRadioButton tempBtn = new JRadioButton("Temp");
 
+        JLabel title = new JLabel("PDF Combiner");
+        JLabel pgsLabel = new JLabel("Page Range");
+        JTextField pgsInput = new JTextField("", 5);
+
         JButton savePdf = new JButton("Save");
         savePdf.addActionListener((e) -> {
             if (outPdfChooser.showSaveDialog(savePdf) == JFileChooser.APPROVE_OPTION) {
                 try {
+                    parsePageRange(pgsInput);
                     MemoryUsageSetting setting = tempBtn.isSelected() ? MemoryUsageSetting.setupTempFileOnly() : MemoryUsageSetting.setupMainMemoryOnly();
                     PDDocument outFile = new PDDocument(setting);
-                    for (Map.Entry<File, Pages> entry : queuedPdfs.entrySet()) {
-                        PDDocument doc = PDDocument.load(entry.getKey(), setting);
-                        boolean[] remPages = entry.getValue().remPages();
-                        int remCtr = 0;
-                        for (int i = 1; i < remPages.length; i++) {
-                            if (remPages[i]) {
-                                doc.removePage(i - remCtr + 1);
-                                remCtr++;
+                    for (PDFEntry pdf : fileList.getSelectedValuesList()) {
+                        PDPageTree doc = PDDocument.load(pdf.getFile(), setting).getPages();
+                        boolean[] remPages = pdf.getPages().remPages();
+                        for (int i = 0; i < doc.getCount(); i++) {
+                            if (!remPages[i + 1]) {
+                                outFile.addPage(doc.get(i));
                             }
                         }
-                        merger.appendDocument(outFile, doc);
                     }
                     outFile.save(outPdfChooser.getSelectedFile());
                 } catch (IOException ex) {
@@ -78,15 +81,12 @@ public class Combine {
         JButton addPdf = new JButton("+");
         addPdf.addActionListener((e) -> {
             if (inPdfChooser.showOpenDialog(addPdf) == JFileChooser.APPROVE_OPTION) {
-                try {
-                    File chosenFile = inPdfChooser.getSelectedFile();
-                    model.add(model.size(), chosenFile.getName());
-                    if (lastSelectedFile == null) {
-                        lastSelectedFile = chosenFile;
-                    }
-                    queuedPdfs.put(chosenFile, new Pages(PDDocument.load(chosenFile).getNumberOfPages()));
-                } catch (IOException ex) {
-                    ex.printStackTrace();
+                PDFEntry input = new PDFEntry(inPdfChooser.getSelectedFile());
+                model.add(model.size(), input);
+                fileList.setSelectedIndex(model.size() - 1);
+                if (lastSelected == null) {
+                    lastSelected = input;
+                    pgsInput.setText(input.getPages().toString());
                 }
             }
         });
@@ -98,35 +98,6 @@ public class Combine {
             }
         });
 
-        JLabel title = new JLabel("PDF Combiner");
-        JLabel pgsLabel = new JLabel("Page Range");
-        JTextField pgsInput = new JTextField("", 5);
-
-        fileList.getSelectionModel().addListSelectionListener((e -> {
-            if (!pgsInput.getText().isEmpty()) {
-                Pages pages = queuedPdfs.get(lastSelectedFile);
-                pages.resetPages();
-                String[] ranges = pgsInput.getText().split(",");
-                for (int i = 0; i < ranges.length; i++) {
-                    String cleanStr = ranges[i].trim().replaceAll(",", "");
-                    if (!cleanStr.isEmpty()) {
-                        if (cleanStr.contains("-")) {
-                            int iodash = cleanStr.indexOf("-");
-                            pages.addRange(new Pages.Range(
-                                    Integer.parseInt(cleanStr.substring(0, iodash)),
-                                    Integer.parseInt(cleanStr.substring(iodash + 1)))
-                            );
-                        } else {
-                            pages.addRange(new Pages.Range(Integer.parseInt(cleanStr)));
-                        }
-                    }
-                }
-            }
-
-            lastSelectedFile = strListedFile(fileList.getSelectedValue());
-            pgsInput.setText(queuedPdfs.get(lastSelectedFile).toString());
-        }));
-
         JButton movePdfUp = new JButton("▲");
         movePdfUp.addActionListener(e -> {
             int sel = fileList.getSelectedIndex();
@@ -135,6 +106,7 @@ public class Combine {
                 fileList.setSelectedIndex(sel - 1);
             }
         });
+
         JButton movePdfDown = new JButton("▼");
         movePdfDown.addActionListener(e -> {
             int sel = fileList.getSelectedIndex();
@@ -143,6 +115,15 @@ public class Combine {
                 fileList.setSelectedIndex(sel + 1);
             }
         });
+
+        fileList.getSelectionModel().addListSelectionListener((e -> {
+            if (fileList.getSelectedIndex() != -1) {
+                parsePageRange(pgsInput);
+                PDFEntry next = model.get(fileList.getSelectedIndex());
+                pgsInput.setText(next.getPages().toString());
+                lastSelected = next;
+            }
+        }));
 
         ButtonGroup pdfBoxMem = new ButtonGroup();
         JPanel panelMem = new JPanel();
@@ -182,19 +163,30 @@ public class Combine {
         frame.getContentPane().add(comp, constraints);
     }
 
-    private static File strListedFile(String name) {
-        for (File file : queuedPdfs.keySet()) {
-            if (file.getName().equals(name)) {
-                return file;
-            }
-        }
-        return null;
-    }
-
-    private static void swap(DefaultListModel<String> model, int a, int b) {
-        String aStr = model.getElementAt(a);
-        String bStr = model.getElementAt(b);
+    private static void swap(DefaultListModel<PDFEntry> model, int a, int b) {
+        PDFEntry aStr = model.getElementAt(a);
+        PDFEntry bStr = model.getElementAt(b);
         model.set(a, bStr);
         model.set(b, aStr);
+    }
+
+    private static void parsePageRange(JTextField pgsInput) {
+        if (lastSelected != null) {
+            lastSelected.getPages().resetPages();
+            if (!pgsInput.getText().isBlank()) {
+                String[] inPages = pgsInput.getText().split(",");
+                for (String inPage : inPages) {
+                    String cleanStr = inPage.replaceAll(",", "").trim();
+                    if (cleanStr.contains("-")) {
+                        int iodash = cleanStr.indexOf("-");
+                        int start = Integer.parseInt(cleanStr.substring(0, iodash));
+                        int end = Integer.parseInt(cleanStr.substring(iodash + 1));
+                        lastSelected.getPages().addRange(new Pages.Range(start, end));
+                    } else if (!cleanStr.isBlank()) {
+                        lastSelected.getPages().addRange(new Pages.Range(Integer.parseInt(cleanStr)));
+                    }
+                }
+            }
+        }
     }
 }
