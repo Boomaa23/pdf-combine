@@ -62,7 +62,8 @@ public class Combine {
                     parsePageRange(pgsInput);
                     MemoryUsageSetting setting = tempBtn.isSelected() ? MemoryUsageSetting.setupTempFileOnly() : MemoryUsageSetting.setupMainMemoryOnly();
                     PDDocument outFile = new PDDocument(setting);
-                    for (PDFEntry pdf : fileList.getSelectedValuesList()) {
+                    for (int k = 0; k < model.size(); k++) {
+                        PDFEntry pdf = model.getElementAt(k);
                         PDPageTree doc = PDDocument.load(pdf.getFile(), setting).getPages();
                         boolean[] remPages = pdf.getPages().remPages();
                         for (int i = 0; i < doc.getCount(); i++) {
@@ -72,6 +73,7 @@ public class Combine {
                         }
                     }
                     outFile.save(outPdfChooser.getSelectedFile());
+                    outFile.close();
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
