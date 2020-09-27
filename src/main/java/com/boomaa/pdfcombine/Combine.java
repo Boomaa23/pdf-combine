@@ -39,7 +39,19 @@ public class Combine {
         inPdfChooser.addChoosableFileFilter(new FileFilter() {
             @Override
             public boolean accept(File f) {
-                return f.isDirectory() || f.getName().substring(f.getName().lastIndexOf('.') + 1).toLowerCase().equals("pdf");
+                return f.isDirectory() || f.toString().endsWith("pdf");
+            }
+
+            @Override
+            public String getDescription() {
+                return "Adobe PDF Files (*.pdf)";
+            }
+        });
+        outPdfChooser.setAcceptAllFileFilterUsed(false);
+        outPdfChooser.addChoosableFileFilter(new FileFilter() {
+            @Override
+            public boolean accept(File f) {
+                return true;
             }
 
             @Override
@@ -48,8 +60,11 @@ public class Combine {
             }
         });
 
-        JRadioButton memBtn = new JRadioButton("Memory");
         JRadioButton tempBtn = new JRadioButton("Temp");
+        JRadioButton memBtn = new JRadioButton("Memory");
+
+        memBtn.addActionListener((e) -> JOptionPane.showMessageDialog(frame,
+                "WARNING: This often does not work.", "Warning", JOptionPane.WARNING_MESSAGE));
 
         JLabel title = new JLabel("PDF Combiner");
         JLabel pgsLabel = new JLabel("Page Range");
@@ -72,7 +87,8 @@ public class Combine {
                             }
                         }
                     }
-                    outFile.save(outPdfChooser.getSelectedFile());
+                    String filename = outPdfChooser.getSelectedFile().toString();
+                    outFile.save(new File(!filename.endsWith(".pdf") ? filename + ".pdf" : filename));
                     outFile.close();
                 } catch (IOException ex) {
                     ex.printStackTrace();
@@ -129,11 +145,12 @@ public class Combine {
 
         ButtonGroup pdfBoxMem = new ButtonGroup();
         JPanel panelMem = new JPanel();
-        pdfBoxMem.add(memBtn);
         pdfBoxMem.add(tempBtn);
-        memBtn.setSelected(true);
-        panelMem.add(memBtn);
+        pdfBoxMem.add(memBtn);
+        tempBtn.setSelected(true);
         panelMem.add(tempBtn);
+        panelMem.add(memBtn);
+
 
         constraints.anchor = GridBagConstraints.CENTER;
         addConstrainedPanel(title, 0, 0, 3, 1);
