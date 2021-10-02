@@ -12,7 +12,9 @@ public class PDFEntry {
     public PDFEntry(File file) {
         this.file = file;
         try {
-            this.pages = new Pages(PDDocument.load(file).getNumberOfPages());
+            PDDocument doc = PDDocument.load(file);
+            this.pages = new Pages(doc.getNumberOfPages());
+            doc.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

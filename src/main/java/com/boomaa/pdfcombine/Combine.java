@@ -1,7 +1,6 @@
 package com.boomaa.pdfcombine;
 
 import org.apache.pdfbox.io.MemoryUsageSetting;
-import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPageTree;
 
@@ -35,6 +34,7 @@ public class Combine {
         JFileChooser inPdfChooser = new JFileChooser();
         JFileChooser outPdfChooser = new JFileChooser();
 
+        inPdfChooser.setMultiSelectionEnabled(true);
         inPdfChooser.setAcceptAllFileFilterUsed(false);
         inPdfChooser.addChoosableFileFilter(new FileFilter() {
             @Override
@@ -99,12 +99,14 @@ public class Combine {
         JButton addPdf = new JButton("+");
         addPdf.addActionListener((e) -> {
             if (inPdfChooser.showOpenDialog(addPdf) == JFileChooser.APPROVE_OPTION) {
-                PDFEntry input = new PDFEntry(inPdfChooser.getSelectedFile());
-                model.add(model.size(), input);
-                fileList.setSelectedIndex(model.size() - 1);
-                if (lastSelected == null) {
-                    lastSelected = input;
-                    pgsInput.setText(input.getPages().toString());
+                for (File entry : inPdfChooser.getSelectedFiles()) {
+                    PDFEntry input = new PDFEntry(entry);
+                    model.add(model.size(), input);
+                    fileList.setSelectedIndex(model.size() - 1);
+                    if (lastSelected == null) {
+                        lastSelected = input;
+                        pgsInput.setText(input.getPages().toString());
+                    }
                 }
             }
         });
@@ -134,6 +136,13 @@ public class Combine {
             }
         });
 
+        JButton resetAll = new JButton("↻");
+        resetAll.addActionListener(e -> {
+            model.clear();
+            fileList.removeAll();
+            pgsInput.setText("");
+        });
+
         fileList.getSelectionModel().addListSelectionListener((e -> {
             if (fileList.getSelectedIndex() != -1) {
                 parsePageRange(pgsInput);
@@ -151,23 +160,23 @@ public class Combine {
         panelMem.add(tempBtn);
         panelMem.add(memBtn);
 
-
         constraints.anchor = GridBagConstraints.CENTER;
         addConstrainedPanel(title, 0, 0, 3, 1);
         constraints.fill = GridBagConstraints.HORIZONTAL;
         addConstrainedPanel(pgsLabel, 3, 0, 1, 1);
         addConstrainedPanel(panelMem, 0, 1, 3, 1);
         addConstrainedPanel(pgsInput, 3, 1, 1, 1);
-        addConstrainedPanel(fileScroll, 0, 2, 3, 5);
+        addConstrainedPanel(fileScroll, 0, 2, 3, 6);
         constraints.fill = GridBagConstraints.BOTH;
         addConstrainedPanel(addPdf, 3, 2, 1, 1);
         addConstrainedPanel(remPdf, 3, 3, 1, 1);
         addConstrainedPanel(movePdfUp, 3, 4, 1, 1);
         addConstrainedPanel(movePdfDown, 3, 5, 1, 1);
-        addConstrainedPanel(savePdf, 3, 6, 1, 1);
+        addConstrainedPanel(resetAll, 3, 6, 1, 1);
+        addConstrainedPanel(savePdf, 3, 7, 1, 1);
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setPreferredSize(new Dimension(240, 285));
+        frame.setPreferredSize(new Dimension(240, 330));
         frame.setResizable(false);
         frame.pack();
         frame.setLocationRelativeTo(null);
